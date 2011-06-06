@@ -283,7 +283,7 @@ def create_db_v_2(conn, curs, ver):
 	return ver
 
 def main():
-	parser = optionParser()
+	parser = option_parser()
 	(options, args) = parser.parse_args()
 
 	config = {}
@@ -317,7 +317,7 @@ def read_config():
 			config[key.strip()] = value.strip()
 	return config
 
-def optionParser():
+def option_parser():
 	usage = "usage: %prog [options]\nTakes instant messaging logs and stores them in an imap server in the folder imbackup.  Will update the stored messages if a log gets appended to between runs."
 	parser = OptionParser(usage=usage)
 	parser.add_option("-v", "--verbose", action="store_true", dest="verbose", help="Verbose")
