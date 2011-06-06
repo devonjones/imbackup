@@ -79,14 +79,14 @@ def get_subject(msg_format, body):
 				return line.split(':', 1)[1].strip()
 	return ""
 
-def update_message(imap, filename):
+def update_message(imap, config, filename):
 	remove_message(imap, filename)
 	msg = generate_message(imap, filename)
-	send_message(imap, msg)
+	send_message(imap, config, msg)
 
-def create_message(imap, filename):
+def create_message(imap, config, filename):
 	msg = generate_message(imap, filename)
-	send_message(imap, msg)
+	send_message(imap, config, msg)
 
 def remove_message(imap, filename):
 	protocol, msg_format, msg_to, msg_from, msg_date = split_filename(filename)
@@ -136,9 +136,8 @@ def construct_message(imap, msg_format, msg_to, msg_from, msg_date, msg_subject,
 		print e
 	return msg
 
-def send_message(imap, msg):
-	path = "imbackup"
-	imap.append(path, None, None, msg.as_string())
+def send_message(imap, config, msg):
+	imap.append(config['folder'], None, None, msg.as_string())
 
 def update_file_in_db(curs, filename, mtime_ms):
 	sql = ''.join([
@@ -164,7 +163,7 @@ def check_file_in_db(curs, filename):
 	return curs.fetchone()
 
 def visit(arg, dirname, names):
-	conn, curs, imap, verbose = arg
+	conn, curs, imap, config = arg
 	if len(names) > 0 and os.path.isfile(dirname + "/" + names[0]):
 		for name in names:
 			filename = dirname + "/" + name
@@ -172,52 +171,42 @@ def visit(arg, dirname, names):
 			mtime_ms = int(os.path.getmtime(filename) * 1000)
 			rec = check_file_in_db(curs, filename)
 			if not rec:
-				create_message(imap, filename)
+				create_message(imap, config, filename)
 				add_file_to_db(curs, filename, mtime_ms)
 				conn.commit()
-				if verbose:
+				if config['verbose']:
 					print "Added %s" % filename
 			elif rec[2] < mtime_ms:
-				update_message(imap, filename)
+				update_message(imap, config, filename)
 				update_file_in_db(curs, filename, mtime_ms)
 				conn.commit()
-				if verbose:
+				if config['verbose']:
 					print "Updated: %s" % filename
 			else:
 				pass
 
-def process_files(conn, imap, verbose):
+def process_files(conn, imap, config):
 	curs = conn.cursor()
 	try:
-		os.path.walk(os.path.expanduser("~/.purple/logs"), visit, (conn, curs, imap, verbose))
+		os.path.walk(os.path.expanduser("~/.purple/logs"), visit, (conn, curs, imap, config))
 	finally:
 		curs.close()
 
-def get_imap_handle(imapconfig):
+def get_imap_handle(config):
 	try:
-		ssl = False
-		port = imapconfig.get('port')
-		if imapconfig.has_key('ssl'):
-			if imapconfig['ssl'] == 'true':
-				ssl = True
-		if ssl:
-			if not port:
-				port = 993
-			imap = imaplib.IMAP4_SSL(imapconfig['server'])
+		if config['ssl']:
+			imap = imaplib.IMAP4_SSL(config['server'], config['port'])
 		else:
-			if not port:
-				port = 143
-			imap = imaplib.IMAP4(imapconfig['server'])
-		imap.login(imapconfig['login'], imapconfig['password'])
+			imap = imaplib.IMAP4(config['server'], config['port'])
+		imap.login(config['login'], config['password'])
 	except Exception, e:
 		print("IMAP on fire eh?")
 		exit(-1)
 	return imap
 
-def setup_imap_server(imap):
-	path = "imbackup"
-	create_imap_path(imap, path, subscribe=True)
-	imap.select(path)
+def setup_imap_server(imap, config):
+	create_imap_path(imap, config['folder'], subscribe=True)
+	imap.select(config['folder'])
 
 def create_imap_path(imap, folder, subscribe=True):
 	response = imap.list(folder)
@@ -292,6 +281,7 @@ def main():
 	except IOError, e:
 		print "Error locating config file."
 
+	config = merge_config(config, options)
 	if(not config.has_key('login') or not config.has_key('password') or not config.has_key('server')):
 		print "Error in config file.  Please ensure user, password, and server are defined."
 		print "File should be located at %s/.imbackup/config and should resemble:" % os.path.expanduser("~")
@@ -302,9 +292,37 @@ def main():
 
 	conn = get_db_connection()
 	imap = get_imap_handle(config)
-	setup_imap_server(imap)
-	process_files(conn, imap, options.verbose)
+	setup_imap_server(imap, config)
+	process_files(conn, imap, config)
 	return(0)
+
+def merge_config(config, options):
+	if config.has_key('ssl'):
+		if config['ssl'] == 'true':
+			config['ssl'] = True
+	config['verbose'] = options.verbose
+	if options.login:
+		config['login'] = options.login
+	if options.password:
+		config['password'] = options.password
+	if options.server:
+		config['server'] = options.server
+	if options.port:
+		config['port'] = options.port
+	if options.ssl:
+		config['ssl'] = True
+	if options.folder:
+		config['folder'] = options.folder
+	if not config.has_key('ssl'):
+		config['ssl'] = False
+	if not config.has_key('port'):
+		if config['ssl']:
+			config['port'] = 993
+		else:
+			config['port'] = 143
+	if not config.has_key('folder'):
+		config['folder'] = 'imbackup'
+	return config
 
 def read_config():
 	"""Read the user's configuration file"""
@@ -320,8 +338,15 @@ def read_config():
 def option_parser():
 	usage = "usage: %prog [options]\nTakes instant messaging logs and stores them in an imap server in the folder imbackup.  Will update the stored messages if a log gets appended to between runs."
 	parser = OptionParser(usage=usage)
+	parser.add_option("-l", "--login", dest="login", help="Login, overrides ~/.imbackup/config")
+	parser.add_option("-p", "--password", dest="password", help="Password, overrides ~/.imbackup/config")
+	parser.add_option("-s", "--server", dest="server", help="Server, overrides ~/.imbackup/config")
+	parser.add_option("-P", "--port", dest="port", help="Port, overrides ~/.imbackup/config")
+	parser.add_option("-S", "--ssl", action="store_true", dest="ssl", help="SSL = true, overrides ~/.imbackup/config")
+	parser.add_option("-f", "--folder", dest="folder", help="Folder, overrides ~/.imbackup/config")
 	parser.add_option("-v", "--verbose", action="store_true", dest="verbose", help="Verbose")
 	parser.set_defaults(verbose = False)
+	parser.set_defaults(ssl = False)
 	return parser
 
 if __name__ == "__main__":
