@@ -1,0 +1,5 @@
+login: [imap username]
+password: [imap password]
+server: [address of imap host]
+port: [imap server's port] [optional, default 143, 993 if ssl = true]
+ssl: [true or false] [optional, default false]

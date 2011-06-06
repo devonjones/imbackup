@@ -196,12 +196,17 @@ def process_files(conn, imap, verbose):
 def get_imap_handle(imapconfig):
 	try:
 		ssl = False
+		port = imapconfig.get('port')
 		if imapconfig.has_key('ssl'):
 			if imapconfig['ssl'] == 'true':
 				ssl = True
 		if ssl:
+			if not port:
+				port = 993
 			imap = imaplib.IMAP4_SSL(imapconfig['server'])
 		else:
+			if not port:
+				port = 143
 			imap = imaplib.IMAP4(imapconfig['server'])
 		imap.login(imapconfig['login'], imapconfig['password'])
 	except Exception, e:
@@ -283,7 +288,7 @@ def main():
 
 	config = {}
 	try:
-		config = readConfig()
+		config = read_config()
 	except IOError, e:
 		print "Error locating config file."
 
@@ -301,7 +306,7 @@ def main():
 	process_files(conn, imap, options.verbose)
 	return(0)
 
-def readConfig():
+def read_config():
 	"""Read the user's configuration file"""
 	configlines = open(os.path.expanduser("~") +  "/.imbackup/config").readlines()
 	config = {}

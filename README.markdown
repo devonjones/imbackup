@@ -19,7 +19,8 @@ Create ~/.imbackup/config with the following contents:
     login: [imap username]
     password: [imap password]
     server: [address of imap host]
-    ssl: [true or false]
+    port: [imap server's port] [optional, default 143, 993 if ssl = true]
+    ssl: [true or false] [optional, default false]
 
 Run imbackup:
 
@@ -28,9 +29,7 @@ Run imbackup:
 
 **TODO**
 
-* add port optionally to config
-* add foldername to config (right now defaults to imbackup
+* add foldername to config (right now defaults to imbackup)
 * add all config values as command line arguments
-* test on gmail's IMAP
-    * test on other IMAP servers
+* test on other IMAP servers
 * test on adium's logs
