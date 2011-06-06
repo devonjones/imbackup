@@ -3,25 +3,31 @@ Uploads the logs one by one to your imap server specified by the file ~/.imbacku
 
 So far this has only been tested on Ubuntu/Linux Mint, and against xithe dovecot IMAP server (www.dovecot.org/).
 
-*Requirements:*
+**Requirements:**
+
 * BeautifulSoup: http://www.crummy.com/software/BeautifulSoup/
 * dateutil: http://labix.org/python-dateutil
 
-*Ubuntu Setup:*
+**Ubuntu Setup:**
+
     sudo apt-get install python-beautifulsoup python-dateutil
 
-*Setup:*
+**Setup:**
+
 Create ~/.imbackup/config with the following contents:
+
     login: [imap username]
     password: [imap password]
     server: [address of imap host]
     ssl: [true or false]
 
 Run imbackup:
+
     cd imbackup/bin
     ./imbackup.py
 
-*TODO*
+**TODO**
+
 * add port optionally to config
 * add foldername to config (right now defaults to imbackup
 * add all config values as command line arguments
